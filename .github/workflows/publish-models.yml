@@ -1,0 +1,30 @@
+name: publish-models
+on:
+  push:
+    paths: ['.github/workflows/publish-models.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - tag: whisper-small
+            repo: Systran/faster-whisper-small
+          - tag: whisper-turbo
+            repo: deepdml/faster-whisper-large-v3-turbo-ct2
+    steps:
+      - name: Download model from Hugging Face
+        run: |
+          pip install -q -U huggingface_hub
+          python -c "from huggingface_hub import snapshot_download as d; d('${{ matrix.repo }}', local_dir='m', ignore_patterns=['*.md','.gitattributes'])"
+          rm -rf m/.cache
+          ls -la m
+      - name: Publish as GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ matrix.tag }}" m/* --repo "${{ github.repository }}" --title "${{ matrix.tag }}" --notes "Copy of ${{ matrix.repo }} (MIT license, OpenAI Whisper weights converted to CTranslate2) for the Montage Lab skill." || gh release upload "${{ matrix.tag }}" m/* --clobber --repo "${{ github.repository }}"
